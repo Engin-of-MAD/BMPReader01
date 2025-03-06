@@ -8,19 +8,17 @@
 #include <cstdint>
 #include <string>
 #include <filesystem>
+#include <vector>
 
 #pragma pack(push, 1)
 
 struct BmpFileHeader {
-    uint16_t bfType{0x4D42};                ///< File type always BM which is 0x4D42
+    uint16_t bfType{0};                ///< File type always BM which is 0x4D42
     uint32_t bfSize{0};                     ///< Size of the file (in bytes)
     uint16_t bfReserved1{0};                ///< Reserved, always 0
     uint16_t bfReserved2{0};                ///< Reserved, always 0
     uint32_t bfOffBits{0};                  ///< Start position of pixel data (bytes from the beginning of the file)
 };
-#pragma pack(pop)
-
-
 struct BmpInfoHeader {
     uint32_t biSize{0};                     ///< Size of this header (in bytes)
     int32_t biWidth{0};                     ///< width of bitmap in pixels
@@ -39,16 +37,25 @@ struct BmpInfoHeader {
 };
 
 
+#pragma pack(pop)
+
+
 class BmpImage{
 public:
-    void load(const std::filesystem::path& path);
+    BmpImage(const std::string& path);
+    void load();
     void save(const std::filesystem::path& fileBmp);
     void outputOnDisplay();
     void drawLine(int x, int y);
     void drawCross();
 private:
-    BmpFileHeader bmpFile;
-    BmpInfoHeader bmpInfo;
+    uint32_t row_stride() const;
+
+    BmpFileHeader fileHeader;
+    BmpInfoHeader infoHeader;
+    std::filesystem::path _pathToBmp;
+    std::vector<uint8_t> data;
+
 };
 
 
