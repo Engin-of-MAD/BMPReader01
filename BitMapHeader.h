@@ -45,8 +45,9 @@ public:
     BmpImage(const std::string& path);
     void load();
     void save(const std::filesystem::path& fileBmp);
+    void debugOutput();
     void outputOnDisplay();
-    void drawLine(int x, int y);
+    void drawLine(int x1, int y1, int x2, int y2);
     void drawCross();
 private:
     uint32_t row_stride() const;
