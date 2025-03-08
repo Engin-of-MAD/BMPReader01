@@ -16,12 +16,15 @@ void BmpImage::load() {
 
      bmpFile.read(reinterpret_cast<char *>(&fileHeader), sizeof(BmpFileHeader));
      bmpFile.read(reinterpret_cast<char *>(&infoHeader), sizeof(BmpInfoHeader));
+
      if (fileHeader.bfType != 0x4D42)
          throw std::runtime_error("Invalid BMP format");
      if (infoHeader.biBitCount != 24 && infoHeader.biBitCount != 32)
          throw std::runtime_error("Only 24/32-bit BMP supported");
+
     bmpFile.seekg(fileHeader.bfOffBits, bmpFile.beg);
     data.resize(infoHeader.biWidth * infoHeader.biHeight * (infoHeader.biBitCount / 8));
+
     if (infoHeader.biWidth % 4 == 0) {
         bmpFile.read(reinterpret_cast<char*>(data.data()), data.size());
         fileHeader.bfSize += data.size();
@@ -34,6 +37,7 @@ void BmpImage::load() {
             bmpFile.read(reinterpret_cast<char *>(padding_row.data()), padding_row.size());
         }
     }
+    bmpFile.close();
 }
 
 void BmpImage::outputOnDisplay() {
@@ -48,7 +52,7 @@ void BmpImage::outputOnDisplay() {
             // Проверка цвета (BGR-формат)
             if (pixel[0] == 0 && pixel[1] == 0 && pixel[2] == 0) { // Черный
                 std::cout << "\033[40m \033[0m";
-            } else { // Белый или другие цвета (по условию только черный/белый)
+            } else if (pixel[0] == 255 && pixel[1] == 255 && pixel[2] == 255) { // Белый или другие цвета (по условию только черный/белый)
                 std::cout << "\033[47m \033[0m";
             }
         }
@@ -57,14 +61,6 @@ void BmpImage::outputOnDisplay() {
     std::cout << '\n';
 }
 
-
-
-void BmpImage::debugOutput() {
-    for (int i = 0; i < data.size(); ++i) {
-        uint8_t tmp = data[i];
-        std::cout << tmp << std::endl;
-    }
-}
 
 BmpImage::BmpImage(const std::string& path) : _pathToBmp(path) {
     load();
@@ -79,69 +75,84 @@ uint32_t BmpImage::row_stride() const {
     }
 }
 
-void BmpImage::drawLine(int x1, int y1, int x2, int y2) {
+void BmpImage::drawLine(std::pair<int, int> pointA, std::pair<int,int> pointB, bool color) {
     const int bytes_per_pixel = infoHeader.biBitCount / 8;
-    int dx = abs(x2 - x1);
-    int dy = -abs(y2 - y1);
-    int sx = x1 < x2 ? 1 : -1;
-    int sy = y1 < y2 ? 1 : -1;
+    int dx = abs(pointB.first - pointA.first);
+    int dy = -abs(pointB.second - pointA.second);
+    int sx = pointA.first < pointB.first ? 1 : -1;
+    int sy = pointA.second < pointB.second ? 1 : -1;
     int error = dx + dy;
+
+    // Проверка границ точек
+    if (pointA.first < 0 || pointA.first >=  infoHeader.biWidth ||
+        pointA.second < 0 || pointA.second >= infoHeader.biHeight ||
+        pointB.first < 0 || pointB.first >=  infoHeader.biWidth ||
+        pointB.second < 0 || pointB.second >= infoHeader.biHeight) {
+        throw std::invalid_argument("Point out border of image");
+    }
 
     // Учет выравнивания BMP
     int rowSize = (infoHeader.biWidth * bytes_per_pixel + 3) & ~3;
 
     while (true) {
         // Проверка текущих координат
-        bool current_inside = (x1 >= 0 && x1 < infoHeader.biWidth && y1 >= 0 && y1 < infoHeader.biHeight);
+        bool current_inside = (pointA.first >= 0 && pointA.first < infoHeader.biWidth && pointA.second >= 0 && pointA.second < infoHeader.biHeight);
 
         if (current_inside) {
-            int invertedY = infoHeader.biHeight - 1 - y1;
-            int index = invertedY * rowSize + x1 * bytes_per_pixel;
+            int invertedY = infoHeader.biHeight - 1 - pointA.second;
+            int index = invertedY * rowSize + pointA.first * bytes_per_pixel;
 
-            data[index] = 0;     // Синий
-            data[index + 1] = 0; // Зеленый
-            data[index + 2] = 0; // Красный
+            if (color){
+                data[index] = 255;
+                data[index + 1] = 255;
+                data[index + 2] = 255;
+            } else {
+                data[index] = 0;
+                data[index + 1] = 0;
+                data[index + 2] = 0;
+            }
 
             if (bytes_per_pixel == 4) {
                 data[index + 3] = 255; // Альфа
             }
         }
 
-        if (x1 == x2 && y1 == y2) break;
+        if (pointA.first == pointB.first && pointA.second == pointB.second) break;
 
         int e2 = 2 * error;
 
         if (e2 >= dy) { // Движение по X
             error += dy;
-            x1 += sx;
+            pointA.first += sx;
         }
 
         if (e2 <= dx) { // Движение по Y
             error += dx;
-            y1 += sy;
+            pointA.second += sy;
         }
     }
 
 }
 
 void BmpImage::drawCross() {
-    drawLine(0, 0, infoHeader.biWidth - 1, infoHeader.biHeight - 1);
-    drawLine(1, 0, infoHeader.biWidth - 2, infoHeader.biHeight - 1);
-    drawLine(infoHeader.biWidth - 1, 0, 0, infoHeader.biHeight - 1);
-    drawLine(infoHeader.biWidth - 2, 0, 1, infoHeader.biHeight - 1);
+    drawLine({0, 0}, {infoHeader.biWidth - 1, infoHeader.biHeight - 1});
+    drawLine({infoHeader.biWidth - 1, 0}, {0, infoHeader.biHeight - 1});
 }
+
 
 void BmpImage::save(const std::filesystem::path &file) {
     std::ofstream of(file, std::ios::binary);
-    if (infoHeader.biBitCount == 32 ) {
-        of.write(reinterpret_cast<const char*>(&fileHeader), sizeof(fileHeader));
-        of.write(reinterpret_cast<const char*>(&infoHeader), sizeof(infoHeader));
-        of.write(reinterpret_cast<const char*>(data.data()), data.size());
-    } else if (infoHeader.biBitCount == 24) {
-        if (infoHeader.biWidth % 4 == 0) {
-            of.write(reinterpret_cast<const char*>(&fileHeader), sizeof(fileHeader));
-            of.write(reinterpret_cast<const char*>(&infoHeader), sizeof(infoHeader));
-            of.write(reinterpret_cast<const char*>(data.data()), data.size());
-        }
+    if (infoHeader.biBitCount == 32 )
+        writeData(of);
+    else if (infoHeader.biBitCount == 24) {
+        if (infoHeader.biWidth % 4 == 0)
+            writeData(of);
     }
+    of.close();
+}
+
+void BmpImage::writeData(std::ofstream &of) {
+    of.write(reinterpret_cast<const char*>(&fileHeader), sizeof(fileHeader));
+    of.write(reinterpret_cast<const char*>(&infoHeader), sizeof(infoHeader));
+    of.write(reinterpret_cast<const char*>(data.data()), data.size());
 }

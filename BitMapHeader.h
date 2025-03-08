@@ -45,12 +45,19 @@ public:
     BmpImage(const std::string& path);
     void load();
     void save(const std::filesystem::path& fileBmp);
-    void debugOutput();
+
     void outputOnDisplay();
-    void drawLine(int x1, int y1, int x2, int y2);
+    /**
+     * @brief Функция для рисования линий принимает две пары и булевый параметр цвета
+     * @param [in]pointA first -x, second - y
+     * @param [in]pointB first -x, second - y
+     * @param [in]color true - белый, false - чёрный
+     */
+    void drawLine(std::pair<int, int> pointA, std::pair<int,int> pointB, bool color = false);
     void drawCross();
 private:
     uint32_t row_stride() const;
+    void writeData(std::ofstream& of);
 
     BmpFileHeader fileHeader;
     BmpInfoHeader infoHeader;
