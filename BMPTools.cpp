@@ -48,16 +48,18 @@ void BmpImage::outputOnDisplay() {
         const uint8_t* row = data.data() + y * stride;
         for (int x = 0; x < infoHeader.biWidth; ++x) {
             const uint8_t* pixel = row + x * bytes_per_pixel;
-            //
-            if (pixel[0] == 0 && pixel[1] == 0 && pixel[2] == 0) {
-                std::cout << "\033[40m \033[0m";
-            } else if (pixel[0] == 255 && pixel[1] == 255 && pixel[2] == 255) {
-                std::cout << "\033[47m \033[0m";
+            bool isWhite = (pixel[0] == 255 && pixel[1] == 255 && pixel[2] == 255);
+            bool isBlack = (pixel[0] == 0 && pixel[1] == 0 && pixel[2] == 0);
+
+            if (!isBlack && !isWhite) {
+                throw std::runtime_error("The image contains colors other than black and white");
             }
+            std::cout<< (isBlack ? "\033[40m \033[0m": "\033[47m \033[0m") ;
+
         }
-        std::cout << '\n'; // Новая строка изображения
+        std::cout << '\n'; // New row of the image
     }
-    std::cout << '\n';
+    std::cout << '\n'; // Padding after image
 }
 
 
@@ -130,24 +132,42 @@ void BmpImage::drawLine(std::pair<int, int> pointA, std::pair<int,int> pointB, b
 }
 
 void BmpImage::drawCross() {
-    drawLine({0, 0}, {infoHeader.biWidth - 1, infoHeader.biHeight - 1});
-    drawLine({infoHeader.biWidth - 1, 0}, {0, infoHeader.biHeight - 1});
+    drawLine({0, 0}, {infoHeader.biWidth - 1, infoHeader.biHeight - 1}, true);
+    drawLine({infoHeader.biWidth - 1, 0}, {0, infoHeader.biHeight - 1}, true);
 }
 
 
-void BmpImage::save(const std::filesystem::path &file) {
+void BmpImage::save(const std::filesystem::path &output) {
+    std::filesystem::path file(output);
+    file.replace_extension("bmp");
     std::ofstream of(file, std::ios::binary);
-    if (infoHeader.biBitCount == 32 )
+
+    try {
         writeData(of);
-    else if (infoHeader.biBitCount == 24) {
-        if (infoHeader.biWidth % 4 == 0)
-            writeData(of);
+   } catch (...) {
+        of.close();
+        std::filesystem::remove(file); // Удаляем битый файл
+        throw;
     }
     of.close();
 }
 
 void BmpImage::writeData(std::ofstream &of) {
+    // Записываем заголовки
     of.write(reinterpret_cast<const char*>(&fileHeader), sizeof(fileHeader));
     of.write(reinterpret_cast<const char*>(&infoHeader), sizeof(infoHeader));
-    of.write(reinterpret_cast<const char*>(data.data()), data.size());
-}
+
+    // Обработка данных для 24-битных BMP
+    if (infoHeader.biBitCount == 24) {
+        const uint32_t stride = row_stride();
+        const uint32_t padding = stride - (infoHeader.biWidth * 3);
+        std::vector<uint8_t> padBytes(padding, 0);
+
+        for (uint32_t y = 0; y < infoHeader.biHeight; ++y) {
+            const uint8_t* row = data.data() + y * stride;
+            of.write(reinterpret_cast<const char*>(row), infoHeader.biWidth * 3);
+            of.write(reinterpret_cast<const char*>(padBytes.data()), padBytes.size());
+        }
+    } else { // 32-битные
+        of.write(reinterpret_cast<const char*>(data.data()), data.size());
+    }}

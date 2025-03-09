@@ -9,6 +9,7 @@ int main() {
     try {
         bmp.load(input);
         bmp.outputOnDisplay();
+
         bmp.drawCross();
         bmp.outputOnDisplay();
         std::cout << "Enter new name for file:" << std::endl;
