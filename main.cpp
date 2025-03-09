@@ -5,13 +5,19 @@ int main() {
     std::string output;
     std::cout << "Please enter path to bmp file:"<< std::endl;
     std::cin >> input;
-    BmpImage a(input);
-    a.outputOnDisplay();
-    a.drawCross();
-    a.outputOnDisplay();
-    std::cout << "Enter new name for file:" << std::endl;
-    std::cin >> output;
-    a.save(output);
+    BmpImage bmp;
+    try {
+        bmp.load(input);
+        bmp.outputOnDisplay();
+        bmp.drawCross();
+        bmp.outputOnDisplay();
+        std::cout << "Enter new name for file:" << std::endl;
+        std::cin >> output;
+        bmp.save(output);
+    } catch (std::exception& e) {
+        std::cerr <<"Error: "<< e.what() << std::endl;
+    }
+
     return 0;
 }
 

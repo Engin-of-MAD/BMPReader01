@@ -8,11 +8,11 @@
 #ifdef _WIN32
 #endif
 
-void BmpImage::load() {
+void BmpImage::load(const std::filesystem::path& path) {
 
-    std::ifstream bmpFile(_pathToBmp, std::ios::binary);
+    std::ifstream bmpFile(path, std::ios::binary);
     if (!bmpFile)
-        throw std::runtime_error("File not found: " + _pathToBmp.string());
+        throw std::runtime_error("File not found: " + path.string());
 
      bmpFile.read(reinterpret_cast<char *>(&fileHeader), sizeof(BmpFileHeader));
      bmpFile.read(reinterpret_cast<char *>(&infoHeader), sizeof(BmpInfoHeader));
@@ -44,15 +44,14 @@ void BmpImage::outputOnDisplay() {
     const int bytes_per_pixel = infoHeader.biBitCount / 8;
     const uint32_t stride = row_stride();
 
-    // Перебор строк снизу вверх (как хранится в BMP)
     for (int y = infoHeader.biHeight - 1; y >= 0; --y) {
         const uint8_t* row = data.data() + y * stride;
         for (int x = 0; x < infoHeader.biWidth; ++x) {
             const uint8_t* pixel = row + x * bytes_per_pixel;
-            // Проверка цвета (BGR-формат)
-            if (pixel[0] == 0 && pixel[1] == 0 && pixel[2] == 0) { // Черный
+            //
+            if (pixel[0] == 0 && pixel[1] == 0 && pixel[2] == 0) {
                 std::cout << "\033[40m \033[0m";
-            } else if (pixel[0] == 255 && pixel[1] == 255 && pixel[2] == 255) { // Белый или другие цвета (по условию только черный/белый)
+            } else if (pixel[0] == 255 && pixel[1] == 255 && pixel[2] == 255) {
                 std::cout << "\033[47m \033[0m";
             }
         }
@@ -61,10 +60,6 @@ void BmpImage::outputOnDisplay() {
     std::cout << '\n';
 }
 
-
-BmpImage::BmpImage(const std::string& path) : _pathToBmp(path) {
-    load();
-}
 
 uint32_t BmpImage::row_stride() const {
     if (infoHeader.biBitCount == 24) {

@@ -42,8 +42,8 @@ struct BmpInfoHeader {
 
 class BmpImage{
 public:
-    BmpImage(const std::string& path);
-    void load();
+
+    void load(const std::filesystem::path& path);
     void save(const std::filesystem::path& fileBmp);
 
     void outputOnDisplay();
@@ -61,9 +61,7 @@ private:
 
     BmpFileHeader fileHeader;
     BmpInfoHeader infoHeader;
-    std::filesystem::path _pathToBmp;
     std::vector<uint8_t> data;
-
 };
 
 
